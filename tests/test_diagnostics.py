@@ -208,3 +208,11 @@ def test_diagnostics_tolerate_api_without_fetch_status() -> None:
     diagnostics = _diagnostics_for({"devices": {}})
 
     assert diagnostics["device_fetch_status"] == {}
+
+
+def test_station_access_key_and_owner_names_are_redacted():
+    payload = {"station_info": {"ak": "secret", "owner_list": [{"name": "Jan"}], "money_unit": "PLN"}}
+    redacted = diagnostics_module._redact_sensitive_keys(payload)
+    assert redacted["station_info"]["ak"] == "**REDACTED**"
+    assert redacted["station_info"]["owner_list"] == "**REDACTED**"
+    assert redacted["station_info"]["money_unit"] == "PLN"

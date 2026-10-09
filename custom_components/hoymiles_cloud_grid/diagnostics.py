@@ -69,6 +69,9 @@ REDACT_KEYS = {
     "mobile",
     "user_id",
     "uid",
+    # station_info carries an access key and the owners' real names.
+    "ak",
+    "owner_list",
 }
 
 # Any key ending in one of these is redacted as well, so an unknown field in a
@@ -161,6 +164,7 @@ def _station_summary(station_data: dict[str, Any]) -> dict[str, Any]:
         "grid_indicators": station_data.get("grid_indicators", {}),
         "load_indicators": station_data.get("load_indicators", {}),
         "energy_flow": station_data.get("energy_flow", {}),
+        "energy_flow_periods": station_data.get("energy_flow_periods", {}),
         "setting_rules": station_data.get("setting_rules", {}),
         "battery_mode_gating": {
             "backend_modes": get_backend_modes(station_data.get("battery_settings")),
