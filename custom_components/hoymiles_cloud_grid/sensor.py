@@ -210,6 +210,15 @@ def compute_self_consumption_rate(station_data: dict[str, Any]) -> float | None:
     return round((pv_to_load / total_pv) * 100, 2)
 
 
+def compute_period_consumption(station_data: dict[str, Any], period: str) -> int | None:
+    """Return home consumption (load from PV + battery + grid) for month/year/total."""
+    flow = station_data.get("energy_flow_periods", {}).get(period) or {}
+    parts = [safe_float_convert(flow.get(key)) for key in ("lfp", "lfb", "lfg")]
+    if all(part is None for part in parts):
+        return None
+    return round(sum(part or 0 for part in parts))
+
+
 def compute_self_sufficiency_rate(station_data: dict[str, Any]) -> float | None:
     """Return the self-sufficiency ratio in percent."""
     load_from_pv = safe_float_convert(get_energy_flow_value(station_data.get("energy_flow"), "lfp")) or 0.0
@@ -392,6 +401,18 @@ STATION_SENSORS: list[HoymilesSensorDescription] = [
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
         value_fn=lambda data: safe_int_convert(get_reflux_data(data).get("use_eq_total")),
+    ),
+    *(
+        HoymilesSensorDescription(
+            key=f"consumption_{period}",
+            name=f"Consumption {label}",
+            native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
+            device_class=SensorDeviceClass.ENERGY,
+            state_class=SensorStateClass.TOTAL_INCREASING,
+            value_fn=lambda data, period=period: compute_period_consumption(data, period),
+            exists_fn=lambda data, period=period: compute_period_consumption(data, period) is not None,
+        )
+        for period, label in (("month", "Month"), ("year", "Year"), ("total", "Total"))
     ),
     HoymilesSensorDescription(
         key="grid_import_total",

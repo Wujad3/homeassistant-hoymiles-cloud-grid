@@ -87,6 +87,8 @@ class StationData:
     live_max_age: int = 90
     telemetry_available: bool = False
     energy_flow: dict[str, Any] = field(default_factory=dict)
+    # Energy-flow stats for longer periods: {"month": {...}, "year": {...}, "total": {...}}
+    energy_flow_periods: dict[str, Any] = field(default_factory=dict)
     pv_indicators: dict[str, Any] = field(default_factory=dict)
     grid_indicators: dict[str, Any] = field(default_factory=dict)
     load_indicators: dict[str, Any] = field(default_factory=dict)

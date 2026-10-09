@@ -583,6 +583,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             "eps_settings": api.get_eps_settings,
             "ai_status": api.get_ai_status,
             "firmware": api.get_firmware_status,
+            # Month / year / lifetime energy-flow stats, as shown in S-Miles.
+            **({
+                f"energy_flow_{period}": (lambda sid, mode=mode: api.get_energy_flow(sid, mode=mode))
+                for period, mode in (("month", 2), ("year", 3), ("total", 4))
+            } if fetch_energy_flow else {}),
         }
 
         async def fetch(name: str, method: Any) -> tuple[str, Any]:
@@ -620,6 +625,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             "eps_settings": keep("eps_settings"),
             "ai_status": keep("ai_status", AIStatus),
             "firmware": keep("firmware", FirmwareStatus),
+            "energy_flow_periods": {
+                period: (
+                    results[f"energy_flow_{period}"]
+                    if results[f"energy_flow_{period}"] is not None
+                    else previous.get("energy_flow_periods", {}).get(period, {})
+                )
+                for period in ("month", "year", "total")
+                if f"energy_flow_{period}" in results
+            },
         }
 
     station_limit = asyncio.Semaphore(3)
@@ -718,6 +732,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 live_max_age=max(90, scan_interval * 2),
                 telemetry_available=bool(real_time_data or live_data),
                 energy_flow=EnergyFlow(energy_flow).as_dict(),
+                energy_flow_periods=static_payload.get("energy_flow_periods", {}),
                 pv_indicators=pv_indicators,
                 grid_indicators=grid_indicators,
                 load_indicators=load_indicators,
