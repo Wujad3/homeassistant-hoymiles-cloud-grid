@@ -21,14 +21,14 @@ from homeassistant.helpers import device_registry as dr, entity_registry as er, 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from custom_components.hoymiles_cloud import (  # noqa: E402
+from custom_components.hoymiles_cloud_grid import (  # noqa: E402
     PLATFORMS,
     async_setup_entry,
     async_unload_entry,
 )
-from custom_components.hoymiles_cloud import config_flow  # noqa: E402
-from custom_components.hoymiles_cloud.const import DOMAIN  # noqa: E402
-from custom_components.hoymiles_cloud.hoymiles_api import LiveDataAuthError  # noqa: E402
+from custom_components.hoymiles_cloud_grid import config_flow  # noqa: E402
+from custom_components.hoymiles_cloud_grid.const import DOMAIN  # noqa: E402
+from custom_components.hoymiles_cloud_grid.hoymiles_api import LiveDataAuthError  # noqa: E402
 
 
 class FakeAPI:
@@ -119,7 +119,7 @@ async def main() -> None:
 
         async def forward(_manager, _entry, platforms):
             for platform in platforms:
-                module = __import__(f"custom_components.hoymiles_cloud.{platform.value}", fromlist=["async_setup_entry"])
+                module = __import__(f"custom_components.hoymiles_cloud_grid.{platform.value}", fromlist=["async_setup_entry"])
                 entities[platform.value] = []
                 await module.async_setup_entry(
                     hass, entry, lambda additions, update_before_add=False, key=platform.value: entities[key].extend(additions)
@@ -129,8 +129,8 @@ async def main() -> None:
             return True
 
         with (
-            patch("custom_components.hoymiles_cloud.HoymilesAPI", FakeAPI),
-            patch("custom_components.hoymiles_cloud.async_get_clientsession", return_value=object()),
+            patch("custom_components.hoymiles_cloud_grid.HoymilesAPI", FakeAPI),
+            patch("custom_components.hoymiles_cloud_grid.async_get_clientsession", return_value=object()),
             patch.object(ConfigEntries, "async_forward_entry_setups", forward),
             patch.object(ConfigEntries, "async_unload_platforms", unload),
             patch.object(ConfigEntry, "async_start_reauth_if_available", reauth),
@@ -197,8 +197,8 @@ async def main() -> None:
             return True
 
         with (
-            patch("custom_components.hoymiles_cloud.config_flow.HoymilesAPI", FakeAPI),
-            patch("custom_components.hoymiles_cloud.config_flow.async_get_clientsession", return_value=object()),
+            patch("custom_components.hoymiles_cloud_grid.config_flow.HoymilesAPI", FakeAPI),
+            patch("custom_components.hoymiles_cloud_grid.config_flow.async_get_clientsession", return_value=object()),
             patch.object(ConfigEntries, "async_reload", reload),
         ):
             flow = config_flow.ConfigFlow()

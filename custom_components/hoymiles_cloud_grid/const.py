@@ -1,6 +1,6 @@
 """Constants for the Hoymiles Cloud integration."""
 
-DOMAIN = "hoymiles_cloud"
+DOMAIN = "hoymiles_cloud_grid"
 
 # Storage constants
 STORAGE_VERSION = 1

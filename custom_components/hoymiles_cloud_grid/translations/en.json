@@ -2,7 +2,7 @@
   "config": {
     "step": {
       "user": {
-        "title": "Hoymiles Cloud",
+        "title": "Hoymiles Cloud (Grid Fix)",
         "description": "Enter your Hoymiles Cloud credentials",
         "data": {
           "username": "Username (Email)",

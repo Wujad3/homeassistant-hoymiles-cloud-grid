@@ -24,7 +24,7 @@ import aiohttp
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 INTEGRATION_ROOT = REPO_ROOT / "custom_components" / "hoymiles_cloud"
-PACKAGE_NAME = "custom_components.hoymiles_cloud"
+PACKAGE_NAME = "custom_components.hoymiles_cloud_grid"
 
 
 def _load_module(module_name: str, path: pathlib.Path):

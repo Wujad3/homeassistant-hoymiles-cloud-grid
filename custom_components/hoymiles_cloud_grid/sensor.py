@@ -130,6 +130,18 @@ def get_nested_energy_total(station_data: dict[str, Any], key: str, period: str)
     return safe_int_convert(get_reflux_data(station_data).get(key, {}).get(period))
 
 
+def get_grid_energy_total(
+    station_data: dict[str, Any], direction: str, period: str, fallback: Any = None
+) -> int | None:
+    """Return a grid energy counter, preferring grid_*_eq over mb_*_eq."""
+    reflux = get_reflux_data(station_data)
+    for key in (f"grid_{direction}_eq", f"mb_{direction}_eq"):
+        value = safe_int_convert(reflux.get(key, {}).get(period))
+        if value is not None:
+            return value
+    return safe_int_convert(fallback)
+
+
 def has_pv_indicator(station_data: dict[str, Any], key: str) -> bool:
     """Return whether a PV indicator key is present."""
     return get_pv_indicator_value(station_data.get("pv_indicators", {}), key) is not None
@@ -329,7 +341,7 @@ STATION_SENSORS: list[HoymilesSensorDescription] = [
         native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
-        value_fn=lambda data: safe_int_convert(get_reflux_data(data).get("meter_b_in_eq")),
+        value_fn=lambda data: get_grid_energy_total(data, "in", "today_eq", get_reflux_data(data).get("meter_b_in_eq")),
     ),
     HoymilesSensorDescription(
         key="grid_export_energy_today",
@@ -337,7 +349,7 @@ STATION_SENSORS: list[HoymilesSensorDescription] = [
         native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
-        value_fn=lambda data: safe_int_convert(get_reflux_data(data).get("meter_b_out_eq")),
+        value_fn=lambda data: get_grid_energy_total(data, "out", "today_eq", get_reflux_data(data).get("meter_b_out_eq")),
     ),
     HoymilesSensorDescription(
         key="battery_charge_energy_today",
@@ -373,7 +385,7 @@ STATION_SENSORS: list[HoymilesSensorDescription] = [
         native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
-        value_fn=lambda data: get_nested_energy_total(data, "mb_in_eq", "total_eq"),
+        value_fn=lambda data: get_grid_energy_total(data, "in", "total_eq"),
     ),
     HoymilesSensorDescription(
         key="grid_export_total",
@@ -381,7 +393,7 @@ STATION_SENSORS: list[HoymilesSensorDescription] = [
         native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
-        value_fn=lambda data: get_nested_energy_total(data, "mb_out_eq", "total_eq"),
+        value_fn=lambda data: get_grid_energy_total(data, "out", "total_eq"),
     ),
     HoymilesSensorDescription(
         key="grid_import_month",
@@ -389,7 +401,7 @@ STATION_SENSORS: list[HoymilesSensorDescription] = [
         native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
-        value_fn=lambda data: get_nested_energy_total(data, "mb_in_eq", "month_eq"),
+        value_fn=lambda data: get_grid_energy_total(data, "in", "month_eq"),
     ),
     HoymilesSensorDescription(
         key="grid_import_year",
@@ -397,7 +409,7 @@ STATION_SENSORS: list[HoymilesSensorDescription] = [
         native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
-        value_fn=lambda data: get_nested_energy_total(data, "mb_in_eq", "year_eq"),
+        value_fn=lambda data: get_grid_energy_total(data, "in", "year_eq"),
     ),
     HoymilesSensorDescription(
         key="grid_export_month",
@@ -405,7 +417,7 @@ STATION_SENSORS: list[HoymilesSensorDescription] = [
         native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
-        value_fn=lambda data: get_nested_energy_total(data, "mb_out_eq", "month_eq"),
+        value_fn=lambda data: get_grid_energy_total(data, "out", "month_eq"),
     ),
     HoymilesSensorDescription(
         key="grid_export_year",
@@ -413,7 +425,7 @@ STATION_SENSORS: list[HoymilesSensorDescription] = [
         native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
-        value_fn=lambda data: get_nested_energy_total(data, "mb_out_eq", "year_eq"),
+        value_fn=lambda data: get_grid_energy_total(data, "out", "year_eq"),
     ),
     HoymilesSensorDescription(
         key="pv_to_battery_today",
