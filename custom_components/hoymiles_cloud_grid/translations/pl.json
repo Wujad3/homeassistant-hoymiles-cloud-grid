@@ -60,23 +60,23 @@
   "options": {
     "step": {
       "init": {
-        "title": "Hoymiles Cloud Options",
-        "description": "Configure the integration options",
+        "title": "Opcje Hoymiles Cloud (Grid Fix)",
+        "description": "Ustawienia integracji i roku rozliczeniowego",
         "data": {
-          "scan_interval": "Data update interval (seconds)",
-          "fetch_grid_indicators": "Fetch 3-phase grid indicators",
-          "fetch_energy_flow": "Fetch daily energy-flow statistics",
-          "fetch_eps_profit": "Fetch EPS profit and spend statistics",
-          "billing_start_month": "Billing period start – month (1-12)",
-          "billing_start_day": "Billing period start – day (1-31)",
-          "billing_export_factor": "Export factor for balance (e.g. 0.8 for net-metering)",
-          "billing_set_import_kwh": "Set grid import counter now (kWh, optional)",
-          "billing_set_export_kwh": "Set grid export counter now (kWh, optional)",
-          "billing_set_pv_kwh": "Set PV production counter now (kWh, optional)"
+          "scan_interval": "Interwał odświeżania danych (sekundy)",
+          "fetch_grid_indicators": "Pobieraj parametry sieci 3-fazowej",
+          "fetch_energy_flow": "Pobieraj dzienne statystyki przepływu energii",
+          "fetch_eps_profit": "Pobieraj statystyki zysków i kosztów EPS",
+          "billing_start_month": "Początek roku rozliczeniowego – miesiąc (1-12)",
+          "billing_start_day": "Początek roku rozliczeniowego – dzień (1-31)",
+          "billing_export_factor": "Współczynnik oddanej energii w saldzie (np. 0.8 dla opustów)",
+          "billing_set_import_kwh": "Ustaw licznik poboru z sieci (kWh, opcjonalnie)",
+          "billing_set_export_kwh": "Ustaw licznik oddania do sieci (kWh, opcjonalnie)",
+          "billing_set_pv_kwh": "Ustaw licznik produkcji PV (kWh, opcjonalnie)"
         },
         "data_description": {
-          "billing_start_month": "Billing-period sensors reset at midnight on this day every year. Changing the date resets them.",
-          "billing_set_import_kwh": "Leave empty to keep the current value. Use it to enter what was already used since the period started."
+          "billing_start_month": "Liczniki roku rozliczeniowego zerują się o północy tego dnia co roku. Zmiana daty zeruje liczniki.",
+          "billing_set_import_kwh": "Zostaw puste, aby nie zmieniać. Wpisz, ile już zużyto od początku roku rozliczeniowego (np. z S-Miles lub rachunku)."
         }
       }
     }

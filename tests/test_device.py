@@ -15,7 +15,7 @@ def test_build_station_device_info_uses_energy_storage_model() -> None:
 
     assert info["name"] == "Roof Station"
     assert info["model"] == "Energy Storage Plant"
-    assert ("hoymiles_cloud", "123") in info["identifiers"]
+    assert ("hoymiles_cloud_grid", "123") in info["identifiers"]
 
 
 def test_build_inverter_device_info_links_back_to_station() -> None:
@@ -26,6 +26,6 @@ def test_build_inverter_device_info_links_back_to_station() -> None:
         {"sn": "INV-1", "model_no": "HYS-3.6", "soft_ver": "1.2.3", "hard_ver": "A"},
     )
 
-    assert info["via_device"] == ("hoymiles_cloud", "123")
-    assert ("hoymiles_cloud", "inverter_INV-1") in info["identifiers"]
+    assert info["via_device"] == ("hoymiles_cloud_grid", "123")
+    assert ("hoymiles_cloud_grid", "inverter_INV-1") in info["identifiers"]
     assert info["sw_version"] == "1.2.3"

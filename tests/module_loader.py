@@ -8,20 +8,20 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-PACKAGE_ROOT = ROOT / "custom_components" / "hoymiles_cloud"
+PACKAGE_ROOT = ROOT / "custom_components" / "hoymiles_cloud_grid"
 
 
 def load_integration_module(module_name: str):
     """Load a custom component submodule directly from disk."""
     sys.modules.setdefault("custom_components", types.ModuleType("custom_components"))
 
-    package = sys.modules.get("custom_components.hoymiles_cloud")
+    package = sys.modules.get("custom_components.hoymiles_cloud_grid")
     if package is None:
-        package = types.ModuleType("custom_components.hoymiles_cloud")
+        package = types.ModuleType("custom_components.hoymiles_cloud_grid")
         package.__path__ = [str(PACKAGE_ROOT)]
-        sys.modules["custom_components.hoymiles_cloud"] = package
+        sys.modules["custom_components.hoymiles_cloud_grid"] = package
 
-    full_name = f"custom_components.hoymiles_cloud.{module_name}"
+    full_name = f"custom_components.hoymiles_cloud_grid.{module_name}"
     if full_name in sys.modules:
         return sys.modules[full_name]
 

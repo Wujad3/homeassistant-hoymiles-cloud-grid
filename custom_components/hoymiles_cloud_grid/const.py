@@ -237,6 +237,9 @@ DEFAULT_STATIC_REFRESH_INTERVAL = 300  # seconds
 DEFAULT_FETCH_GRID_INDICATORS = True
 DEFAULT_FETCH_ENERGY_FLOW = True
 DEFAULT_FETCH_EPS_PROFIT = True
+DEFAULT_BILLING_START_MONTH = 1
+DEFAULT_BILLING_START_DAY = 1
+DEFAULT_BILLING_EXPORT_FACTOR = 1.0
 
 # Configuration
 CONF_STATION_ID = "station_id"
@@ -245,6 +248,15 @@ CONF_APP_VERSION = "app_version"
 CONF_FETCH_GRID_INDICATORS = "fetch_grid_indicators"
 CONF_FETCH_ENERGY_FLOW = "fetch_energy_flow"
 CONF_FETCH_EPS_PROFIT = "fetch_eps_profit"
+CONF_BILLING_START_MONTH = "billing_start_month"
+CONF_BILLING_START_DAY = "billing_start_day"
+CONF_BILLING_EXPORT_FACTOR = "billing_export_factor"
+# Stored calibration ({"id", "import", "export", "pv"} in Wh); the form fields
+# below are one-shot inputs in kWh and are never stored themselves.
+CONF_BILLING_CALIBRATION = "billing_calibration"
+CONF_BILLING_SET_IMPORT = "billing_set_import_kwh"
+CONF_BILLING_SET_EXPORT = "billing_set_export_kwh"
+CONF_BILLING_SET_PV = "billing_set_pv_kwh"
 
 # Entity categories
 ENTITY_CATEGORY_DIAGNOSTIC = "diagnostic"

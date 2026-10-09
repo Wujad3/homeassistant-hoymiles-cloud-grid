@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from typing import Any
 
 import voluptuous as vol
@@ -16,11 +17,21 @@ from .auth import AUTH_ERROR_NO_ACCESSIBLE_STATIONS, auth_error_to_config_error
 from .const import (
     AUTH_MODE_AUTO,
     AUTH_MODE_OPTIONS,
+    CONF_BILLING_CALIBRATION,
+    CONF_BILLING_EXPORT_FACTOR,
+    CONF_BILLING_SET_EXPORT,
+    CONF_BILLING_SET_IMPORT,
+    CONF_BILLING_SET_PV,
+    CONF_BILLING_START_DAY,
+    CONF_BILLING_START_MONTH,
     CONF_APP_VERSION,
     CONF_AUTH_MODE,
     CONF_FETCH_ENERGY_FLOW,
     CONF_FETCH_EPS_PROFIT,
     CONF_FETCH_GRID_INDICATORS,
+    DEFAULT_BILLING_EXPORT_FACTOR,
+    DEFAULT_BILLING_START_DAY,
+    DEFAULT_BILLING_START_MONTH,
     DEFAULT_FETCH_ENERGY_FLOW,
     DEFAULT_FETCH_EPS_PROFIT,
     DEFAULT_FETCH_GRID_INDICATORS,
@@ -235,8 +246,26 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         """Manage the options."""
+        options = self.config_entry.options
         if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
+            data = dict(user_input)
+            calibration = {
+                kind: round(float(data[key]) * 1000)
+                for kind, key in (
+                    ("import", CONF_BILLING_SET_IMPORT),
+                    ("export", CONF_BILLING_SET_EXPORT),
+                    ("pv", CONF_BILLING_SET_PV),
+                )
+                if data.get(key) is not None
+            }
+            for key in (CONF_BILLING_SET_IMPORT, CONF_BILLING_SET_EXPORT, CONF_BILLING_SET_PV):
+                data.pop(key, None)
+            if calibration:
+                calibration["id"] = uuid.uuid4().hex
+                data[CONF_BILLING_CALIBRATION] = calibration
+            elif CONF_BILLING_CALIBRATION in options:
+                data[CONF_BILLING_CALIBRATION] = options[CONF_BILLING_CALIBRATION]
+            return self.async_create_entry(title="", data=data)
 
         return self.async_show_form(
             step_id="init",
@@ -244,32 +273,47 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 {
                     vol.Required(
                         CONF_SCAN_INTERVAL,
-                        default=self.config_entry.options.get(
+                        default=options.get(
                             CONF_SCAN_INTERVAL,
                             DEFAULT_SCAN_INTERVAL,
                         ),
                     ): vol.All(vol.Coerce(int), vol.Range(min=30, max=3600)),
                     vol.Required(
                         CONF_FETCH_GRID_INDICATORS,
-                        default=self.config_entry.options.get(
+                        default=options.get(
                             CONF_FETCH_GRID_INDICATORS,
                             DEFAULT_FETCH_GRID_INDICATORS,
                         ),
                     ): bool,
                     vol.Required(
                         CONF_FETCH_ENERGY_FLOW,
-                        default=self.config_entry.options.get(
+                        default=options.get(
                             CONF_FETCH_ENERGY_FLOW,
                             DEFAULT_FETCH_ENERGY_FLOW,
                         ),
                     ): bool,
                     vol.Required(
                         CONF_FETCH_EPS_PROFIT,
-                        default=self.config_entry.options.get(
+                        default=options.get(
                             CONF_FETCH_EPS_PROFIT,
                             DEFAULT_FETCH_EPS_PROFIT,
                         ),
                     ): bool,
+                    vol.Required(
+                        CONF_BILLING_START_MONTH,
+                        default=options.get(CONF_BILLING_START_MONTH, DEFAULT_BILLING_START_MONTH),
+                    ): vol.All(vol.Coerce(int), vol.Range(min=1, max=12)),
+                    vol.Required(
+                        CONF_BILLING_START_DAY,
+                        default=options.get(CONF_BILLING_START_DAY, DEFAULT_BILLING_START_DAY),
+                    ): vol.All(vol.Coerce(int), vol.Range(min=1, max=31)),
+                    vol.Required(
+                        CONF_BILLING_EXPORT_FACTOR,
+                        default=options.get(CONF_BILLING_EXPORT_FACTOR, DEFAULT_BILLING_EXPORT_FACTOR),
+                    ): vol.All(vol.Coerce(float), vol.Range(min=0, max=2)),
+                    vol.Optional(CONF_BILLING_SET_IMPORT): vol.All(vol.Coerce(float), vol.Range(min=0)),
+                    vol.Optional(CONF_BILLING_SET_EXPORT): vol.All(vol.Coerce(float), vol.Range(min=0)),
+                    vol.Optional(CONF_BILLING_SET_PV): vol.All(vol.Coerce(float), vol.Range(min=0)),
                 }
             ),
         )

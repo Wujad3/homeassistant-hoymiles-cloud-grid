@@ -31,10 +31,24 @@ from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity, DataUpdateCoordinator
+from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from .discovery import register_discovery
-from .const import BATTERY_MODES, DOMAIN, METER_LOCATION_NAMES
+from .billing import BillingPeriodTracker
+from .const import (
+    BATTERY_MODES,
+    CONF_BILLING_CALIBRATION,
+    CONF_BILLING_EXPORT_FACTOR,
+    CONF_BILLING_START_DAY,
+    CONF_BILLING_START_MONTH,
+    DEFAULT_BILLING_EXPORT_FACTOR,
+    DEFAULT_BILLING_START_DAY,
+    DEFAULT_BILLING_START_MONTH,
+    DOMAIN,
+    METER_LOCATION_NAMES,
+)
+from .storage import entry_storage_key
 from .data import (
     battery_settings_readable,
     discover_pv_channels,
@@ -669,6 +683,40 @@ async def async_setup_entry(
     coordinator = runtime_data["coordinator"]
     stations = runtime_data["stations"]
 
+    # Trackers outlive entry reloads (options changes) so a pending delayed
+    # save never races with a fresh load of the same Store.
+    tracker_cache: dict[str, BillingPeriodTracker] = hass.data.setdefault(f"{DOMAIN}_billing", {})
+    billing_trackers: dict[str, BillingPeriodTracker] = {}
+    for station_id in stations:
+        cache_key = f"{entry.entry_id}_{station_id}"
+
+        def readings_fn(station_id: str = station_id) -> dict[str, int | None]:
+            station_data = get_station_data(coordinator, station_id)
+            return {
+                "import": get_grid_energy_total(station_data, "in", "total_eq"),
+                "export": get_grid_energy_total(station_data, "out", "total_eq"),
+                "pv": safe_int_convert(station_data.get("real_time_data", {}).get("total_eq")),
+            }
+
+        tracker = tracker_cache.get(cache_key)
+        if tracker is None:
+            store = Store(hass, 1, entry_storage_key(f"{DOMAIN}_billing_{station_id}", entry.entry_id))
+            tracker = BillingPeriodTracker(hass, store, readings_fn)
+            await tracker.async_load()
+            tracker_cache[cache_key] = tracker
+        tracker.configure(
+            int(entry.options.get(CONF_BILLING_START_MONTH, DEFAULT_BILLING_START_MONTH)),
+            int(entry.options.get(CONF_BILLING_START_DAY, DEFAULT_BILLING_START_DAY)),
+            float(entry.options.get(CONF_BILLING_EXPORT_FACTOR, DEFAULT_BILLING_EXPORT_FACTOR)),
+            entry.options.get(CONF_BILLING_CALIBRATION),
+            readings_fn,
+        )
+        if coordinator.data:
+            tracker.update()
+        # Registered before the entities, so trackers update first on each refresh.
+        entry.async_on_unload(coordinator.async_add_listener(tracker.update))
+        billing_trackers[station_id] = tracker
+
     def build_entities() -> list[SensorEntity]:
         """Add newly discovered station, device and PV entities once."""
         entities: list[SensorEntity] = []
@@ -686,6 +734,14 @@ async def async_setup_entry(
                         station_name=station_name,
                     )
                 )
+
+            entities.extend(
+                HoymilesBillingSensor(
+                    coordinator, station_id, station_name, billing_trackers[station_id], kind, label
+                )
+                for kind, label in BILLING_SENSOR_SPECS
+                if station_id in billing_trackers
+            )
 
             if battery_settings_readable(station_data.get("battery_settings", {})):
                 entities.append(HoymilesBatteryModeSensor(coordinator, station_id, station_name))
@@ -1298,3 +1354,63 @@ class HoymilesScheduleEditorDirtySensor(HoymilesBaseSensor):
         return self.coordinator.last_update_success and bool(
             self._get_station_data().get("schedule_editor", {}).get("available_modes")
         )
+
+
+BILLING_SENSOR_SPECS = (
+    ("import", "Billing Period Grid Import"),
+    ("export", "Billing Period Grid Export"),
+    ("pv", "Billing Period PV Production"),
+    ("balance", "Billing Period Grid Balance"),
+)
+
+
+class HoymilesBillingSensor(HoymilesBaseSensor):
+    """Energy accumulated since the start of the configured billing period."""
+
+    _attr_device_class = SensorDeviceClass.ENERGY
+    _attr_native_unit_of_measurement = UnitOfEnergy.WATT_HOUR
+    _attr_suggested_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
+    _attr_suggested_display_precision = 1
+    _attr_state_class = SensorStateClass.TOTAL
+
+    def __init__(
+        self,
+        coordinator: DataUpdateCoordinator,
+        station_id: str,
+        station_name: str,
+        tracker: BillingPeriodTracker,
+        kind: str,
+        label: str,
+    ) -> None:
+        """Initialize the billing-period sensor."""
+        super().__init__(coordinator, station_id, station_name)
+        self._tracker = tracker
+        self._kind = kind
+        self._attr_unique_id = f"{DOMAIN}_{station_id}_billing_{kind}"
+        self._attr_name = f"{station_name} {label}"
+        self._attr_device_info = get_station_device_info(station_id, station_name, self._get_station_data())
+
+    @property
+    def native_value(self) -> StateType:
+        """Return the accumulated energy in Wh."""
+        return self._tracker.value(self._kind)
+
+    @property
+    def last_reset(self) -> datetime | None:
+        """Return the start of the current billing period."""
+        start, _ = self._tracker.period()
+        return dt_util.start_of_local_day(start)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Expose the billing period boundaries."""
+        start, end = self._tracker.period()
+        attributes: dict[str, Any] = {"period_start": start.isoformat(), "period_end": end.isoformat()}
+        if self._kind == "balance":
+            attributes["export_factor"] = self._tracker.export_factor
+        return attributes
+
+    @property
+    def available(self) -> bool:
+        """Stay available while the cloud is down; the stored value is still valid."""
+        return self.native_value is not None

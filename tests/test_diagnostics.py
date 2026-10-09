@@ -30,7 +30,7 @@ def test_async_get_config_entry_diagnostics_redacts_sensitive_fields() -> None:
     """Diagnostics should redact sensitive keys and hide bulky schedules."""
     hass = SimpleNamespace(
         data={
-            "hoymiles_cloud": {
+            "hoymiles_cloud_grid": {
                 "entry-1": {
                     "coordinator": FakeCoordinator(
                         {
@@ -71,7 +71,7 @@ def _diagnostics_for(station_data: dict, api=None) -> dict:
     """Run diagnostics for a single fake station."""
     hass = SimpleNamespace(
         data={
-            "hoymiles_cloud": {
+            "hoymiles_cloud_grid": {
                 "entry-1": {
                     "coordinator": FakeCoordinator({"123": station_data}),
                     "api": api or FakeAPI(),

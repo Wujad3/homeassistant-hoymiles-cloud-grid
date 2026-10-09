@@ -3,6 +3,8 @@
 > **Fork "Grid Fix"** of [Philra94/homeassistant-hoymiles-cloud](https://github.com/Philra94/homeassistant-hoymiles-cloud).
 > Installs as a separate integration (`hoymiles_cloud_grid`) so it can run next to the original.
 > Grid import/export sensors read `grid_in_eq` / `grid_out_eq` (matching the S-Miles app) and fall back to `mb_*` counters.
+> Billing-period sensors (grid import, export, PV production, balance) reset on a start day/month set in the integration options (Configure).
+> Existing values can be entered there in kWh when installing mid-period.
 
 This custom integration for Home Assistant allows you to monitor and control your Hoymiles solar inverter system through the Hoymiles Cloud API.
 
