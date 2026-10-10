@@ -583,13 +583,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             "eps_settings": api.get_eps_settings,
             "ai_status": api.get_ai_status,
             "firmware": api.get_firmware_status,
-            # Monthly energy-flow stats. The backend mode numbering is undocumented:
-            # mode 3 with a "YYYY" date was observed to return the current month,
-            # while mode 2 returned nothing. Year/lifetime pairings are still being
-            # identified via the diagnostics probe, so they are not fetched yet.
+            # Month / year / lifetime energy-flow stats, as shown in S-Miles.
+            # Mode numbers verified against S-Miles; see HoymilesAPI.get_energy_flow.
             **({
                 f"energy_flow_{period}": (lambda sid, mode=mode: api.get_energy_flow(sid, mode=mode))
-                for period, mode in (("month", 3),)
+                for period, mode in (("month", 3), ("year", 4), ("total", 5))
             } if fetch_energy_flow else {}),
         }
 

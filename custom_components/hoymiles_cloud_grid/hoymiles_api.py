@@ -1294,12 +1294,15 @@ class HoymilesAPI:
         flow_type: int = ENERGY_FLOW_STAT_TYPE_FULL,
     ) -> dict[str, Any]:
         """Return station energy-flow stats."""
+        # Observed on a live HIT-10L-G3 station: 1 = day ("YYYY-MM-DD"),
+        # 3 = month ("YYYY-MM"), 4 = year ("YYYY"), 5 = lifetime (no date).
+        # Mode 2 returns no counters.
         if date is None:
             if mode == 1:
                 date = datetime.now().strftime("%Y-%m-%d")
-            elif mode == 2:
-                date = datetime.now().strftime("%Y-%m")
             elif mode == 3:
+                date = datetime.now().strftime("%Y-%m")
+            elif mode == 4:
                 date = datetime.now().strftime("%Y")
             else:
                 date = ""
