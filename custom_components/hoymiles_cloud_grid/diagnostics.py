@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 from copy import deepcopy
+from datetime import datetime
 from typing import Any
 
 try:
@@ -186,6 +188,37 @@ def _station_summary(station_data: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+
+# (mode, date format) combinations of the energy-flow endpoint to try. The
+# backend's mode numbering is not documented; mode 3 + "YYYY" was observed to
+# return the current month, so every plausible pairing is sampled.
+ENERGY_FLOW_PROBES = (
+    (1, "%Y-%m-%d"),
+    (2, "%Y-%m"), (2, "%Y"), (2, ""),
+    (3, "%Y-%m"), (3, "%Y"), (3, ""),
+    (4, "%Y-%m"), (4, "%Y"), (4, ""),
+    (5, "%Y"), (5, ""),
+)
+
+
+async def _probe_energy_flow(api: Any, station_id: str) -> dict[str, Any]:
+    """Sample the energy-flow endpoint once per (mode, date) pairing."""
+    get_energy_flow = getattr(api, "get_energy_flow", None)
+    if get_energy_flow is None:
+        return {}
+    now = datetime.now()
+
+    async def probe(mode: int, fmt: str) -> tuple[str, Any]:
+        date = now.strftime(fmt) if fmt else ""
+        label = f"mode={mode} date={date or '<empty>'}"
+        try:
+            return label, await asyncio.wait_for(get_energy_flow(station_id, mode=mode, date=date), timeout=10)
+        except Exception as err:  # pragma: no cover - diagnostics must not fail
+            return label, f"error: {err}"
+
+    return dict(await asyncio.gather(*(probe(mode, fmt) for mode, fmt in ENERGY_FLOW_PROBES)))
+
+
 async def async_get_config_entry_diagnostics(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -224,6 +257,11 @@ async def async_get_config_entry_diagnostics(
                 for index, station_data in enumerate(coordinator_data.values(), 1)
             },
         },
+    }
+
+    payload["energy_flow_probe"] = {
+        f"station_{index}": await _probe_energy_flow(api, station_id)
+        for index, station_id in enumerate(coordinator_data, 1)
     }
 
     return _redact_sensitive_keys(async_redact_data(payload, REDACT_KEYS))
