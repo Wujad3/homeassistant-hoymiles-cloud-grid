@@ -144,6 +144,15 @@ def get_nested_energy_total(station_data: dict[str, Any], key: str, period: str)
     return safe_int_convert(get_reflux_data(station_data).get(key, {}).get(period))
 
 
+def get_first_int(payload: dict[str, Any], *keys: str) -> int | None:
+    """Return the first key in ``payload`` that holds a usable integer."""
+    for key in keys:
+        value = safe_int_convert(payload.get(key))
+        if value is not None:
+            return value
+    return None
+
+
 def get_grid_energy_total(
     station_data: dict[str, Any], direction: str, period: str, fallback: Any = None
 ) -> int | None:
@@ -382,7 +391,8 @@ STATION_SENSORS: list[HoymilesSensorDescription] = [
         state_class=SensorStateClass.TOTAL_INCREASING,
         exists_fn=has_battery_telemetry,
         device_info_fn=get_battery_device_info,
-        value_fn=lambda data: safe_int_convert(get_reflux_data(data).get("bms_in_eq")),
+        # e2b_total includes grid charging (matches S-Miles); bms_in_eq is PV-only.
+        value_fn=lambda data: get_first_int(get_reflux_data(data), "e2b_total", "bms_in_eq"),
     ),
     HoymilesSensorDescription(
         key="battery_discharge_energy_today",
@@ -392,7 +402,8 @@ STATION_SENSORS: list[HoymilesSensorDescription] = [
         state_class=SensorStateClass.TOTAL_INCREASING,
         exists_fn=has_battery_telemetry,
         device_info_fn=get_battery_device_info,
-        value_fn=lambda data: safe_int_convert(get_reflux_data(data).get("bms_out_eq")),
+        # efb_total includes discharge to the grid (matches S-Miles); bms_out_eq is load-only.
+        value_fn=lambda data: get_first_int(get_reflux_data(data), "efb_total", "bms_out_eq"),
     ),
     HoymilesSensorDescription(
         key="total_consumption_today",
