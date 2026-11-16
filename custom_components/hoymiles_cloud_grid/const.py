@@ -234,6 +234,14 @@ METER_LOCATION_NAMES = {
 # Defaults
 DEFAULT_SCAN_INTERVAL = 60  # seconds
 DEFAULT_STATIC_REFRESH_INTERVAL = 300  # seconds
+# Battery/relay settings reads are cloud jobs: submit + up to 10 status polls
+# 1 s apart, so one read can take ~15-25 s. The old 8/12 s limits cut them off.
+SETTINGS_READ_TIMEOUT = 40  # seconds
+# After a failed settings read that used to work, retry this soon (not 5 min).
+SETTINGS_RETRY_INTERVAL = 60  # seconds
+# Serve the last good optional payload (indicators, settings) for this long
+# when a read fails, instead of turning the entities unavailable.
+OPTIONAL_PAYLOAD_MAX_AGE = 1800  # seconds
 DEFAULT_FETCH_GRID_INDICATORS = True
 DEFAULT_FETCH_ENERGY_FLOW = True
 DEFAULT_FETCH_EPS_PROFIT = True

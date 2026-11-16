@@ -33,10 +33,14 @@ from .const import (
     DEFAULT_STATIC_REFRESH_INTERVAL,
     DOMAIN,
     MODULE_DATA_CACHE_INTERVAL,
+    OPTIONAL_PAYLOAD_MAX_AGE,
+    SETTINGS_READ_TIMEOUT,
+    SETTINGS_RETRY_INTERVAL,
     STORAGE_KEY,
     STORAGE_VERSION,
 )
 from .data import (
+    LastGoodCache,
     add_schedule_entry,
     battery_settings_readable,
     build_schedule_editor_state,
@@ -641,8 +645,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     optional_failures: set[tuple[str, str]] = set()
     control_cache: dict[str, dict[str, Any]] = {}
     control_cache_at: dict[str, float] = {}
+    # Last good optional payloads, served through short cloud hiccups so the
+    # entities do not flap to unavailable on a single slow/failed request.
+    last_good = LastGoodCache(OPTIONAL_PAYLOAD_MAX_AGE)
 
-    async def _optional(station_id: str, name: str, method: Any, timeout: float = 6) -> Any:
+    async def _optional(station_id: str, name: str, method: Any, timeout: float = 10) -> Any:
         """A failed optional endpoint cannot fail station telemetry."""
         try:
             async with request_limit:
@@ -651,9 +658,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             raise
         except Exception as err:
             key = (station_id, name)
-            log = _LOGGER.debug if key in optional_failures else _LOGGER.warning
-            log("Failed to get %s for station %s: %s", name, station_id, err)
-            optional_failures.add(key)
+            # Warn once per outage, and only once the last good data has expired:
+            # short failures are covered by LastGoodCache and logged at debug.
+            covered = last_good.has_recent(key, time.monotonic())
+            log = _LOGGER.debug if covered or key in optional_failures else _LOGGER.warning
+            log(
+                "Failed to get %s for station %s: %s",
+                name,
+                station_id,
+                str(err) or type(err).__name__,
+            )
+            if not covered:
+                optional_failures.add(key)
             return None
         optional_failures.discard((station_id, name))
         return result
@@ -679,10 +695,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 names.append("eps_profit")
                 methods.append(api.get_eps_profit)
             values = await asyncio.gather(*(
-                _optional(station_id, name, method, 45 if name == "live_data" else 6)
+                _optional(station_id, name, method, 45 if name == "live_data" else 10)
                 for name, method in zip(names, methods)
             ))
             payloads = dict(zip(names, values))
+            fetched_at = time.monotonic()
+            for name in ("pv_indicators", "load_indicators", "grid_indicators", "energy_flow", "eps_profit"):
+                if name in payloads:
+                    payloads[name], _ = last_good.resolve((station_id, name), payloads[name], fetched_at)
             real_time_data = payloads.get("real_time_data") or {}
             live_data = payloads.get("live_data") or {}
             live_fetched_at = time.time() if live_data else None
@@ -705,15 +725,37 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
             if (station_id not in control_cache or
                     now - control_cache_at.get(station_id, 0) >= DEFAULT_STATIC_REFRESH_INTERVAL):
+                # Settings reads are cloud jobs (submit, then poll status up to
+                # BATTERY_SETTINGS_MAX_POLLS times), so they need far more than one
+                # HTTP round trip. A failed read keeps the last readable settings
+                # and is retried after SETTINGS_RETRY_INTERVAL instead of 5 min.
                 battery, relay = await asyncio.gather(
-                    _optional(station_id, "battery_settings", api.get_battery_settings, 12),
-                    _optional(station_id, "relay_settings", api.get_relay_settings, 8),
+                    _optional(station_id, "battery_settings", api.get_battery_settings, SETTINGS_READ_TIMEOUT),
+                    _optional(station_id, "relay_settings", api.get_relay_settings, SETTINGS_READ_TIMEOUT),
+                )
+                read_at = time.monotonic()
+                readable = lambda value: bool(value and value.get("readable"))  # noqa: E731
+                battery, battery_fresh = last_good.resolve(
+                    (station_id, "battery_settings"), battery, read_at, is_good=readable
+                )
+                relay, relay_fresh = last_good.resolve(
+                    (station_id, "relay_settings"), relay, read_at, is_good=readable
                 )
                 control_cache[station_id] = {
                     "battery_settings": battery or {},
                     "relay_settings": relay or {},
                 }
-                control_cache_at[station_id] = now
+                # Retry soon only a read that used to work (now served from cache);
+                # an endpoint that never answers keeps the normal refresh interval.
+                retry_soon = any(
+                    not fresh and last_good.has_recent((station_id, name), read_at)
+                    for name, fresh in (("battery_settings", battery_fresh), ("relay_settings", relay_fresh))
+                )
+                control_cache_at[station_id] = (
+                    now - DEFAULT_STATIC_REFRESH_INTERVAL + SETTINGS_RETRY_INTERVAL
+                    if retry_soon
+                    else now
+                )
             control = control_cache[station_id]
             battery_settings = control["battery_settings"]
             relay_settings = control["relay_settings"]

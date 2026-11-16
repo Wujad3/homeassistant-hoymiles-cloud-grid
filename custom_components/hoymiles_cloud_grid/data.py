@@ -549,6 +549,47 @@ def relay_settings_readable(relay_settings: dict[str, Any] | None) -> bool:
     return bool(relay_settings and relay_settings.get("readable"))
 
 
+class LastGoodCache:
+    """Remember the last good value per key and serve it through short read failures.
+
+    The settings reads (battery / relay) go through an asynchronous cloud job
+    that regularly takes longer than one poll, and the indicator endpoints time
+    out now and then. Without this, every failed read turned the entities
+    unavailable until the next successful poll.
+    """
+
+    def __init__(self, max_age: float) -> None:
+        self.max_age = max_age
+        self._items: dict[Any, tuple[Any, float]] = {}
+
+    def resolve(
+        self,
+        key: Any,
+        value: Any,
+        now: float,
+        *,
+        is_good: Any = bool,
+    ) -> tuple[Any, bool]:
+        """Return ``(value_to_use, fresh)``.
+
+        A good ``value`` is stored and returned with ``fresh=True``. Otherwise the
+        last good value is returned (``fresh=False``) while it is younger than
+        ``max_age``; after that the failed ``value`` itself is returned.
+        """
+        if is_good(value):
+            self._items[key] = (value, now)
+            return value, True
+        item = self._items.get(key)
+        if item is not None and now - item[1] <= self.max_age:
+            return item[0], False
+        return value, False
+
+    def has_recent(self, key: Any, now: float) -> bool:
+        """Return whether a good value younger than ``max_age`` is cached."""
+        item = self._items.get(key)
+        return item is not None and now - item[1] <= self.max_age
+
+
 def relay_settings_writable(relay_settings: dict[str, Any] | None) -> bool:
     """Return whether relay settings can be written."""
     return bool(relay_settings and relay_settings.get("writable"))
