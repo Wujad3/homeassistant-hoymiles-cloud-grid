@@ -42,6 +42,7 @@ from .const import (
 from .data import (
     LastGoodCache,
     add_schedule_entry,
+    settings_read_pending,
     battery_settings_readable,
     build_schedule_editor_state,
     build_schedule_payload_from_draft,
@@ -729,12 +730,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 # BATTERY_SETTINGS_MAX_POLLS times), so they need far more than one
                 # HTTP round trip. A failed read keeps the last readable settings
                 # and is retried after SETTINGS_RETRY_INTERVAL instead of 5 min.
-                battery, relay = await asyncio.gather(
-                    _optional(station_id, "battery_settings", api.get_battery_settings, SETTINGS_READ_TIMEOUT),
-                    _optional(station_id, "relay_settings", api.get_relay_settings, SETTINGS_READ_TIMEOUT),
+                # One settings job per station at a time: the cloud answers a
+                # concurrent second read with "[Working Mode] pending, please wait".
+                battery = await _optional(
+                    station_id, "battery_settings", api.get_battery_settings, SETTINGS_READ_TIMEOUT
+                )
+                relay = await _optional(
+                    station_id, "relay_settings", api.get_relay_settings, SETTINGS_READ_TIMEOUT
                 )
                 read_at = time.monotonic()
                 readable = lambda value: bool(value and value.get("readable"))  # noqa: E731
+                pending = {
+                    name: settings_read_pending(value)
+                    for name, value in (("battery_settings", battery), ("relay_settings", relay))
+                }
                 battery, battery_fresh = last_good.resolve(
                     (station_id, "battery_settings"), battery, read_at, is_good=readable
                 )
@@ -745,10 +754,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     "battery_settings": battery or {},
                     "relay_settings": relay or {},
                 }
-                # Retry soon only a read that used to work (now served from cache);
-                # an endpoint that never answers keeps the normal refresh interval.
+                # Retry soon a read that used to work (now served from cache) or that
+                # the cloud reported as busy; an endpoint that never answers keeps
+                # the normal refresh interval.
                 retry_soon = any(
-                    not fresh and last_good.has_recent((station_id, name), read_at)
+                    not fresh and (pending[name] or last_good.has_recent((station_id, name), read_at))
                     for name, fresh in (("battery_settings", battery_fresh), ("relay_settings", relay_fresh))
                 )
                 control_cache_at[station_id] = (

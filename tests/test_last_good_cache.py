@@ -57,3 +57,18 @@ def test_keys_are_independent():
     cache.resolve(("s1", "grid_indicators"), {"list": [1]}, now=0.0)
     value, _ = cache.resolve(("s2", "grid_indicators"), None, now=10.0)
     assert value is None
+
+
+settings_read_pending = data_module.settings_read_pending
+
+
+def test_settings_read_pending_detects_busy_cloud_job():
+    busy = {"readable": False, "error_status": "1", "error_message": "[Working Mode] pending, please wait."}
+    assert settings_read_pending(busy) is True
+
+
+def test_settings_read_pending_ignores_readable_and_other_errors():
+    assert settings_read_pending({"readable": True, "error_message": "pending"}) is False
+    assert settings_read_pending({"readable": False, "error_message": "Unable to read relay settings"}) is False
+    assert settings_read_pending(None) is False
+    assert settings_read_pending({}) is False

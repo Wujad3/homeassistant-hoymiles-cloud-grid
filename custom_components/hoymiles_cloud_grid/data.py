@@ -549,6 +549,18 @@ def relay_settings_readable(relay_settings: dict[str, Any] | None) -> bool:
     return bool(relay_settings and relay_settings.get("readable"))
 
 
+def settings_read_pending(settings: dict[str, Any] | None) -> bool:
+    """Return whether a settings read failed only because another cloud job was running.
+
+    Hoymiles runs one settings job per station at a time and answers a second
+    one with e.g. ``[Working Mode] pending, please wait.``.
+    """
+    if not settings or settings.get("readable"):
+        return False
+    message = str(settings.get("error_message") or "").lower()
+    return "pending" in message or "please wait" in message
+
+
 class LastGoodCache:
     """Remember the last good value per key and serve it through short read failures.
 
