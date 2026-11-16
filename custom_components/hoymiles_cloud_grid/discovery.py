@@ -2,7 +2,62 @@
 
 from __future__ import annotations
 
+import inspect
 from typing import Any, Callable, Iterable
+
+
+try:
+    from homeassistant.helpers import device_registry as dr
+except ImportError:  # unit tests run without Home Assistant
+    dr = None
+
+
+def _device_registry(coordinator: Any) -> Any:
+    """Return the device registry, or None outside Home Assistant."""
+    hass = getattr(coordinator, "hass", None)
+    if dr is None or hass is None:
+        return None
+    return dr.async_get(hass)
+
+
+def _parent_device(registry: Any, identifier: tuple[str, str], entry_id: str) -> Any:
+    """Look up a device of this entry (`async_get_device` is deprecated since 2026.9)."""
+    if hasattr(registry, "async_get_device_by_identifier"):
+        return registry.async_get_device_by_identifier(identifier, entry_id)
+    return registry.async_get_device(identifiers={identifier})
+
+
+def link_via_devices(registry: Any, entry_id: str, entities: Iterable[Any]) -> None:
+    """Replace `via_device` in the entities' device info with `via_device_id`.
+
+    Home Assistant 2026.8 deprecated `via_device` (it stops working in 2027.8);
+    older cores do not accept `via_device_id` and keep `via_device`. Parent
+    devices (the station) come without `via_device` and are registered first,
+    so the child devices (DTU, inverter, battery, meter) link to them by id.
+    """
+    if registry is None or (
+        "via_device_id" not in inspect.signature(registry.async_get_or_create).parameters
+    ):
+        return
+    entities = [
+        entity
+        for entity in entities
+        if isinstance(getattr(entity, "_attr_device_info", None), dict)
+    ]
+    for entity in entities:
+        info = entity._attr_device_info  # noqa: SLF001
+        if "via_device" not in info:
+            registry.async_get_or_create(config_entry_id=entry_id, **info)
+    for entity in entities:
+        info = entity._attr_device_info  # noqa: SLF001
+        via = info.get("via_device")
+        if via is None:
+            continue
+        fields = {key: value for key, value in info.items() if key != "via_device"}
+        parent = _parent_device(registry, via, entry_id)
+        if parent is not None:
+            fields["via_device_id"] = parent.id
+        entity._attr_device_info = fields  # noqa: SLF001
 
 
 def register_discovery(
@@ -24,6 +79,9 @@ def register_discovery(
             pending_ids.add(unique_id)
             new_entities.append(entity)
         if new_entities:
+            link_via_devices(
+                _device_registry(coordinator), getattr(entry, "entry_id", ""), new_entities
+            )
             add_entities(new_entities)
             seen_ids.update(pending_ids)
 
